@@ -52,6 +52,15 @@ func (worker *BlockWorker) Start() error {
 		}
 
 		worker.completed++
+		for _, tx := range blockResult.Result.Transactions {
+			txResult, err := worker.getTransactionRaw(tx.Hash)
+			if err != nil {
+				log.Println("Unable to retrieve tx raw results for tx", tx.Hash, ":", err.Error())
+				continue
+			}
+			tx.Raw = txResult.Result
+		}
+
 		worker.pushTransactions(blockResult.Result.Transactions)
 	}
 
@@ -77,8 +86,7 @@ func (worker *BlockWorker) getBlock(blockID string) (*RPCBlockResult, error) {
 		err        error
 	)
 
-	rpcRequest = rpc.NewRPCRequest("eth_getBlockByNumber", []interface{}{blockID, true})
-
+	rpcRequest = rpc.NewRPCRequest("hpb_getBlockByNumber", []interface{}{blockID, true})
 	rpcPayload, err := json.Marshal(rpcRequest)
 	if err != nil {
 		return nil, err
@@ -108,6 +116,45 @@ func (worker *BlockWorker) getBlock(blockID string) (*RPCBlockResult, error) {
 	err = json.Unmarshal(body, rpcBlockRequest)
 
 	return rpcBlockRequest, err
+}
+
+func (worker *BlockWorker) getTransactionRaw(Hash string) (*RPCRawResult, error) {
+	var (
+		rpcRequest *rpc.RPCRequest
+		body       []byte
+		err        error
+	)
+
+	rpcRequest = rpc.NewRPCRequest("hpb_getRawTransactionByHash", []interface{}{Hash})
+	rpcPayload, err := json.Marshal(rpcRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", worker.endpoint, strings.NewReader(string(rpcPayload)))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("content-type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Println("Error making request to rpc node")
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	body, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Println("Error reading response body")
+		return nil, err
+	}
+
+	rpcRawResult := &RPCRawResult{}
+	err = json.Unmarshal(body, rpcRawResult)
+
+	return rpcRawResult, err
 }
 
 func (worker *BlockWorker) pushTransactions(transactions []*transaction.TransactionResult) {

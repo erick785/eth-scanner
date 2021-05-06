@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/360EntSecGroup-Skylar/excelize/v2"
 	"github.com/cpurta/eth-scanner/cmd/internal/block"
 	"github.com/cpurta/eth-scanner/cmd/internal/transaction"
 	"github.com/urfave/cli"
@@ -27,7 +28,9 @@ type EthereumTransactionScannerRunner struct {
 	rawTransactions      chan *transaction.TransactionResult
 	filteredTransactions chan *transaction.TransactionResult
 
-	outputfile *os.File
+	outputfile *excelize.File
+
+	filePath string
 
 	waitGroup *sync.WaitGroup
 
@@ -53,13 +56,19 @@ func NewCommand(sigKillChan chan os.Signal) cli.Command {
 }
 
 func (runner *EthereumTransactionScannerRunner) initialize(c *cli.Context) error {
-	filepath := fmt.Sprintf("%s-transactions-%d.csv", runner.filterAddress, time.Now().Unix())
+	runner.filePath = fmt.Sprintf("%s-transactions-%s", runner.filterAddress, time.Now().Format("2006/1/02-15:04"))
 
-	file, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		return fmt.Errorf("errror opening %s: %s", filepath, err.Error())
+	runner.outputfile = excelize.NewFile()
+
+	categories := map[string]string{
+		"A1": "hash", "B1": "nonce", "C1": "blockHash",
+		"D1": "blockNumber", "E1": "transactionIndex", "F1": "from",
+		"G1": "to", "H1": "value", "I1": "gas",
+		"J1": "gasPrice", "K1": "input", "L1": "raw"}
+
+	for k, v := range categories {
+		runner.outputfile.SetCellValue("Sheet1", k, v)
 	}
-	runner.outputfile = file
 
 	workers := make([]*block.BlockWorker, 0)
 	for i := 0; i < runner.blockWorkerNum; i++ {

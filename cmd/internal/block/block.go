@@ -8,6 +8,12 @@ type RPCBlockResult struct {
 	Result  BlockResult `json:"result"`
 }
 
+type RPCRawResult struct {
+	ID      int    `json:"id"`
+	JSONRPC string `json:"jsonrpc"`
+	Result  string `json:"result"`
+}
+
 type BlockResult struct {
 	Number           string                           `json:"number"`
 	Hash             string                           `json:"hash"`

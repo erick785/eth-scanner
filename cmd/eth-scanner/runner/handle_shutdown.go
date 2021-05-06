@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"os/signal"
 	"syscall"
 )
@@ -22,6 +23,9 @@ func (runner *EthereumTransactionScannerRunner) handleShutdown() {
 	close(runner.rawTransactions)
 	close(runner.filteredTransactions)
 
-	runner.outputfile.Close()
+	if err := runner.outputfile.SaveAs("Transaction.xlsx"); err != nil {
+		fmt.Println(err)
+	}
+
 	runner.done = true
 }

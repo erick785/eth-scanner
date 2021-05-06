@@ -1,22 +1,33 @@
 package transaction
 
 import (
-	"fmt"
+	"encoding/json"
 	"log"
-	"os"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/360EntSecGroup-Skylar/excelize/v2"
 )
 
+var categories = map[string]string{
+	"hash": "A", "nonce": "B", "blockHash": "C",
+	"blockNumber": "D", "transactionIndex": "E", "from": "F",
+	"to": "G", "value": "H", "gas": "I",
+	"gasPrice": "J", "input": "K", "raw": "L"}
+
 type TransactionReporter struct {
-	outputFile           *os.File
+	outputFile           *excelize.File
 	filteredTransactions chan *TransactionResult
 	waitGroup            *sync.WaitGroup
+	txCount              int
 	done                 bool
 }
 
-func NewTransactionReporter(outputFile *os.File, transactions chan *TransactionResult, wg *sync.WaitGroup) *TransactionReporter {
+func NewTransactionReporter(outputFile *excelize.File, transactions chan *TransactionResult, wg *sync.WaitGroup) *TransactionReporter {
+
 	return &TransactionReporter{
+		txCount:              2,
 		outputFile:           outputFile,
 		filteredTransactions: transactions,
 		waitGroup:            wg,
@@ -29,11 +40,20 @@ func (reporter *TransactionReporter) Start() {
 	for !reporter.done {
 		select {
 		case transaction := <-reporter.filteredTransactions:
-			transactionRow := fmt.Sprintf("%s,%s,%s,%s\n", transaction.BlockHash, transaction.To, transaction.From, transaction.Input)
-			if _, err := reporter.outputFile.WriteString(transactionRow); err != nil {
-				log.Println("Error writing transaction to file:", err.Error())
-				reporter.done = true
+
+			t, _ := json.Marshal(transaction)
+
+			result := make(map[string]interface{})
+			json.Unmarshal(t, &result)
+
+			for k, v := range result {
+				if err := reporter.outputFile.SetCellValue("Sheet1", categories[k]+strconv.Itoa(reporter.txCount), v); err != nil {
+					log.Println("Error writing transaction to file:", err.Error())
+					reporter.done = true
+				}
 			}
+
+			reporter.txCount++
 		default:
 			time.Sleep(time.Millisecond * 100)
 		}
