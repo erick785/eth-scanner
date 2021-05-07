@@ -64,7 +64,7 @@ func (runner *EthereumTransactionScannerRunner) initialize(c *cli.Context) error
 		"A1": "hash", "B1": "nonce", "C1": "blockHash",
 		"D1": "blockNumber", "E1": "transactionIndex", "F1": "from",
 		"G1": "to", "H1": "value", "I1": "gas",
-		"J1": "gasPrice", "K1": "input", "L1": "raw"}
+		"J1": "gasPrice", "K1": "input", "L1": "raw", "M1": "isContract"}
 
 	for k, v := range categories {
 		runner.outputfile.SetCellValue("Sheet1", k, v)

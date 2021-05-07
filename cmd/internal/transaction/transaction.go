@@ -13,4 +13,5 @@ type TransactionResult struct {
 	GasPrice         string `json:"gasPrice"`
 	Input            string `json:"input"`
 	Raw              string `json:"raw"`
+	IsContract       bool   `json:"isContract"`
 }

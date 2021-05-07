@@ -59,6 +59,18 @@ func (worker *BlockWorker) Start() error {
 				continue
 			}
 			tx.Raw = txResult.Result
+
+			codeResult, err := worker.getCode(tx.To)
+			if err != nil {
+				log.Println("Unable to retrieve get code raw results for tx", tx.Hash, ":", err.Error())
+				continue
+			}
+
+			if codeResult.Result == "0x" {
+				tx.IsContract = false
+			} else {
+				tx.IsContract = true
+			}
 		}
 
 		worker.pushTransactions(blockResult.Result.Transactions)
@@ -126,6 +138,45 @@ func (worker *BlockWorker) getTransactionRaw(Hash string) (*RPCRawResult, error)
 	)
 
 	rpcRequest = rpc.NewRPCRequest("hpb_getRawTransactionByHash", []interface{}{Hash})
+	rpcPayload, err := json.Marshal(rpcRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", worker.endpoint, strings.NewReader(string(rpcPayload)))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("content-type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Println("Error making request to rpc node")
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	body, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Println("Error reading response body")
+		return nil, err
+	}
+
+	rpcRawResult := &RPCRawResult{}
+	err = json.Unmarshal(body, rpcRawResult)
+
+	return rpcRawResult, err
+}
+
+func (worker *BlockWorker) getCode(addr string) (*RPCRawResult, error) {
+	var (
+		rpcRequest *rpc.RPCRequest
+		body       []byte
+		err        error
+	)
+
+	rpcRequest = rpc.NewRPCRequest("hpb_getCode", []interface{}{addr, "latest"})
 	rpcPayload, err := json.Marshal(rpcRequest)
 	if err != nil {
 		return nil, err
