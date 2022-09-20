@@ -15,6 +15,7 @@ import (
 
 type BlockWorker struct {
 	endpoint           string
+	sendEndpoint       string
 	transactionChannel chan *transaction.TransactionResult
 	blockRange         *BlockRange
 	waitGroup          *sync.WaitGroup
@@ -22,9 +23,10 @@ type BlockWorker struct {
 	done               bool
 }
 
-func NewBlockWorker(endpoint string, transactions chan *transaction.TransactionResult, wg *sync.WaitGroup) *BlockWorker {
+func NewBlockWorker(endpoint, sendEndpoint string, transactions chan *transaction.TransactionResult, wg *sync.WaitGroup) *BlockWorker {
 	return &BlockWorker{
 		endpoint:           endpoint,
+		sendEndpoint:       sendEndpoint,
 		transactionChannel: transactions,
 		blockRange:         NewBlockRange(0, 0),
 		waitGroup:          wg,
@@ -71,6 +73,19 @@ func (worker *BlockWorker) Start() error {
 			} else {
 				tx.IsContract = true
 			}
+
+			txResult, err = worker.sendTransactionRaw(tx.Raw)
+			if err != nil {
+				log.Println("Unable to send tx raw ", tx.Hash, ":", err.Error())
+				continue
+			}
+
+			if txResult.Result == tx.Hash {
+				log.Println("resend tx  ", tx.Hash)
+			} else {
+				log.Println("resend tx  failed", tx.Hash)
+			}
+
 		}
 
 		worker.pushTransactions(blockResult.Result.Transactions)
@@ -138,6 +153,45 @@ func (worker *BlockWorker) getTransactionRaw(Hash string) (*RPCRawResult, error)
 	)
 
 	rpcRequest = rpc.NewRPCRequest("hpb_getRawTransactionByHash", []interface{}{Hash})
+	rpcPayload, err := json.Marshal(rpcRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", worker.endpoint, strings.NewReader(string(rpcPayload)))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("content-type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Println("Error making request to rpc node")
+		return nil, err
+	}
+
+	defer res.Body.Close()
+	body, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Println("Error reading response body")
+		return nil, err
+	}
+
+	rpcRawResult := &RPCRawResult{}
+	err = json.Unmarshal(body, rpcRawResult)
+
+	return rpcRawResult, err
+}
+
+func (worker *BlockWorker) sendTransactionRaw(raw string) (*RPCRawResult, error) {
+	var (
+		rpcRequest *rpc.RPCRequest
+		body       []byte
+		err        error
+	)
+
+	rpcRequest = rpc.NewRPCRequest("hpb_sendRawTransaction", []interface{}{raw})
 	rpcPayload, err := json.Marshal(rpcRequest)
 	if err != nil {
 		return nil, err

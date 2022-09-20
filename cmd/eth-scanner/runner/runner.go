@@ -15,6 +15,7 @@ import (
 
 type EthereumTransactionScannerRunner struct {
 	endpoint       string
+	sendEndpoint   string
 	blockWorkerNum int
 	startBlock     int64
 	endBlock       int64
@@ -72,7 +73,7 @@ func (runner *EthereumTransactionScannerRunner) initialize(c *cli.Context) error
 
 	workers := make([]*block.BlockWorker, 0)
 	for i := 0; i < runner.blockWorkerNum; i++ {
-		workers = append(workers, block.NewBlockWorker(runner.endpoint, runner.rawTransactions, runner.waitGroup))
+		workers = append(workers, block.NewBlockWorker(runner.endpoint, runner.sendEndpoint, runner.rawTransactions, runner.waitGroup))
 	}
 
 	log.Println("Starting scanner for blocks", runner.startBlock, "-", runner.endBlock)

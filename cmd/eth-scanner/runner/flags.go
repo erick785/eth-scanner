@@ -10,6 +10,12 @@ func (runner *EthereumTransactionScannerRunner) getStartFlags() []cli.Flag {
 			Usage:       "host endpoint of the ethereum node",
 			Destination: &runner.endpoint,
 		},
+		cli.StringFlag{
+			Name:        "send-ethereum-host",
+			Value:       "http://localhost:8545",
+			Usage:       "host endpoint of the ethereum node",
+			Destination: &runner.sendEndpoint,
+		},
 		cli.IntFlag{
 			Name:        "block-workers",
 			Value:       1,
